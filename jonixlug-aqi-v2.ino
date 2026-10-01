@@ -13,9 +13,7 @@
     - InfluxDB su VPS (dashboard Grafana personalizzata)
 
   Basato sul progetto originale JonixLUG ABC (GPLv3, 2019)
-  https://gitlab.com/JonixLUG/jonixlug-aqi
-  Autori originali: Dario P. & Vincenzo Q. (Team JonixLUG)
-  Partner: Piersoft (https://www.piersoft.it/), Peacelink (https://www.peacelink.it/)
+  https://www.jonixlug.altervista.org/jonixlug-aria-bene-comune/
 
   V2 by William Donzelli — APS FareZero Makers Fab Lab — https://farezero.org
   License: GPLv3

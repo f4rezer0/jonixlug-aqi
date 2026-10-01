@@ -116,9 +116,6 @@ Case originale V1: file `.stl` di Alessandro Chiffi / Ondata Studio nel [repo or
 
 **Codice: [GPLv3](LICENSE)** — **Dati raccolti: CC BY 4.0**
 
-Progetto originale **JonixLUG ABC** — [gitlab.com/JonixLUG](https://gitlab.com/JonixLUG)
-- Autori: Dario P. & Vincenzo Q. (Team JonixLUG)
-- Partner: [Piersoft](https://www.piersoft.it/), [Peacelink](https://www.peacelink.it/)
-- Sito progetto: [jonixlug.altervista.org/jonixlug-aria-bene-comune](https://www.jonixlug.altervista.org/jonixlug-aria-bene-comune/)
+Progetto originale **JonixLUG ABC** — [jonixlug.altervista.org](https://www.jonixlug.altervista.org/jonixlug-aria-bene-comune/)
 
-V2 by **APS FareZero Makers Fab Lab** — [farezero.org](https://farezero.org)
+V2 by **William Donzelli** — **APS FareZero Makers Fab Lab** — [farezero.org](https://farezero.org)
