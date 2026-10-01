@@ -1,0 +1,30 @@
+// config.h — Configurazione personalizzabile
+// Copia questo file come config.h e modifica i valori.
+
+// ---- Wi-Fi ----
+const char* WIFI_SSID = "NOME_RETE_WIFI";
+const char* WIFI_PASS = "PASSWORD_WIFI";
+
+// ---- Sensor.Community ----
+// Il sensore viene identificato automaticamente dal chip ID dell'ESP8266.
+// Registra il tuo sensore su https://devices.sensor.community/
+const bool ENABLE_SENSOR_COMMUNITY = true;
+
+// ---- openSenseMap ----
+// Registra un box su https://opensensemap.org/ e inserisci gli ID.
+const bool ENABLE_OPENSENSEMAP = true;
+const char* OSM_BOX_ID      = "IL_TUO_BOX_ID";
+const char* OSM_SENSOR_PM10  = "SENSOR_ID_PM10";
+const char* OSM_SENSOR_PM25  = "SENSOR_ID_PM25";
+const char* OSM_SENSOR_TEMP  = "SENSOR_ID_TEMPERATURA";
+const char* OSM_SENSOR_HUM   = "SENSOR_ID_UMIDITA";
+
+// ---- InfluxDB (VPS) ----
+// Configura il tuo server InfluxDB (v1 line protocol).
+const bool ENABLE_INFLUXDB = true;
+const char* INFLUX_HOST = "167.235.156.83";
+const int   INFLUX_PORT = 8086;
+const char* INFLUX_DB   = "airquality";
+
+// ---- Campionamento ----
+const unsigned long SLEEP_SECONDS = 60 * 15; // 15 minuti tra un ciclo e l'altro

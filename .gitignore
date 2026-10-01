@@ -1,0 +1,7 @@
+# Configurazione locale con credenziali
+config.h
+
+# Arduino IDE
+*.elf
+*.bin
+build/
