@@ -3,8 +3,8 @@
   Sensore particolato (PM2.5 / PM10) con compensazione temperatura e umidità.
 
   Hardware:
-    - Wemos D1 Mini (ESP8266)
-    - DHT22 su pin D2 (GPIO4) — temperatura e umidità
+    - Wemos D1 (ESP8266)
+    - BME280 su I2C (D3/D4) — temperatura, umidità, pressione
     - SDS011 su pin D5/D6 (GPIO14/GPIO12) — particolato
 
   Invio dati a:
@@ -17,31 +17,33 @@
   Autori originali: Dario P. & Vincenzo Q. (Team JonixLUG)
   Partner: Piersoft (https://www.piersoft.it/), Peacelink (https://www.peacelink.it/)
 
-  V2 by APS FareZero Makers Fab Lab — https://farezero.org
+  V2 by William Donzelli — APS FareZero Makers Fab Lab — https://farezero.org
   License: GPLv3
 */
 
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <WiFiClient.h>
-#include <DHT.h>
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
 #include <SDS011.h>
 #include <RunningAverage.h>
 
 #include "config.h"
 
-#define FW_VERSION "farezero-aqi-2.0.0"
+#define FW_VERSION "farezero-aqi-2.1.0"
 
-// --- Pin e sensori ---
-#define DHT_PIN  4
-#define DHT_TYPE DHT22
-#define SDS_TX  12
-#define SDS_RX  14
+// --- Sensori ---
+#define SDS_TX  12   // D6 = GPIO12
+#define SDS_RX  14   // D5 = GPIO14
 
-DHT dht(DHT_PIN, DHT_TYPE);
+Adafruit_BME280 bme;
 SDS011 sds;
 RunningAverage pm25Stats(10);
 RunningAverage pm10Stats(10);
+
+bool bmeOk = false;
 
 // --- Normalizzazione PM in base all'umidità ---
 float normalizePM25(float pm25, float humidity) {
@@ -82,8 +84,7 @@ void disconnectWiFi() {
 }
 
 // --- Sensor.Community ---
-// Due POST separati: uno per SDS011 (X-Pin:1), uno per DHT22 (X-Pin:7)
-void sendToSensorCommunity(float pm10, float pm25, float temp, float hum) {
+void sendToSensorCommunity(float pm10, float pm25, float temp, float hum, float pres) {
   if (!ENABLE_SENSOR_COMMUNITY) return;
 
   String sensorId = "esp8266-" + String(ESP.getChipId());
@@ -112,27 +113,27 @@ void sendToSensorCommunity(float pm10, float pm25, float temp, float hum) {
 
   delay(500);
 
-  // POST 2: dati climatici (DHT22, pin 7)
-  String dhtBody = "{\"software_version\":\"" + String(FW_VERSION) + "\","
+  // POST 2: dati climatici (BME280, pin 11)
+  String bmeBody = "{\"software_version\":\"" + String(FW_VERSION) + "\","
     "\"sensordatavalues\":["
     "{\"value_type\":\"temperature\",\"value\":\"" + String(temp) + "\"},"
-    "{\"value_type\":\"humidity\",\"value\":\"" + String(hum) + "\"}"
+    "{\"value_type\":\"humidity\",\"value\":\"" + String(hum) + "\"},"
+    "{\"value_type\":\"BME280_pressure\",\"value\":\"" + String(pres * 100.0) + "\"}"
     "]}";
 
   http.begin(wc, "http://api.sensor.community/v1/push-sensor-data/");
   http.addHeader("Content-Type", "application/json");
-  http.addHeader("X-Pin", "7");
+  http.addHeader("X-Pin", "11");
   http.addHeader("X-Sensor", sensorId);
 
-  code = http.POST(dhtBody);
-  Serial.print("[SC] DHT → ");
+  code = http.POST(bmeBody);
+  Serial.print("[SC] BME → ");
   Serial.println(code > 0 ? String(code) : "errore " + String(code));
   http.end();
 }
 
 // --- openSenseMap ---
-// Un POST per ogni sensore
-void sendToOpenSenseMap(float pm10, float pm25, float temp, float hum) {
+void sendToOpenSenseMap(float pm10, float pm25, float temp, float hum, float pres) {
   if (!ENABLE_OPENSENSEMAP) return;
 
   struct { const char* id; float value; const char* label; } sensors[] = {
@@ -140,12 +141,13 @@ void sendToOpenSenseMap(float pm10, float pm25, float temp, float hum) {
     { OSM_SENSOR_PM25, pm25, "PM2.5" },
     { OSM_SENSOR_TEMP, temp, "Temp" },
     { OSM_SENSOR_HUM,  hum,  "Hum" },
+    { OSM_SENSOR_PRES, pres, "Press" },
   };
 
   WiFiClient wc;
   HTTPClient http;
 
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 5; i++) {
     String url = "http://api.opensensemap.org/boxes/" + String(OSM_BOX_ID) + "/" + String(sensors[i].id);
     String body = "{\"value\":" + String(sensors[i].value) + "}";
 
@@ -163,8 +165,7 @@ void sendToOpenSenseMap(float pm10, float pm25, float temp, float hum) {
 }
 
 // --- InfluxDB ---
-// Line protocol: air,sensor=farezero pm25=X,pm10=X,temperature=X,humidity=X
-void sendToInfluxDB(float pm10, float pm25, float temp, float hum) {
+void sendToInfluxDB(float pm10, float pm25, float temp, float hum, float pres) {
   if (!ENABLE_INFLUXDB) return;
 
   WiFiClient wc;
@@ -175,7 +176,8 @@ void sendToInfluxDB(float pm10, float pm25, float temp, float hum) {
     " pm25=" + String(pm25)
     + ",pm10=" + String(pm10)
     + ",temperature=" + String(temp)
-    + ",humidity=" + String(hum);
+    + ",humidity=" + String(hum)
+    + ",pressure=" + String(pres);
 
   http.begin(wc, url);
   http.addHeader("Content-Type", "text/plain");
@@ -192,7 +194,16 @@ void setup() {
   Serial.println("\n=== JonixLUG-AQI V2 — FareZero ===");
   Serial.print("Chip ID: ");
   Serial.println(ESP.getChipId());
-  dht.begin();
+
+  // BME280 su I2C (indirizzo 0x76 o 0x77)
+  bmeOk = bme.begin(0x76);
+  if (!bmeOk) bmeOk = bme.begin(0x77);
+  if (bmeOk) {
+    Serial.println("BME280 trovato.");
+  } else {
+    Serial.println("BME280 non trovato! Controlla i collegamenti.");
+  }
+
   sds.begin(SDS_TX, SDS_RX);
   delay(10);
 }
@@ -208,12 +219,20 @@ void loop() {
     return;
   }
 
-  // DHT22
-  float h = dht.readHumidity();
-  float t = dht.readTemperature();
+  // BME280
+  if (!bmeOk) {
+    Serial.println("BME280 non disponibile, riprovo tra 1 minuto.");
+    disconnectWiFi();
+    delay(60000);
+    return;
+  }
 
-  if (isnan(h) || isnan(t)) {
-    Serial.println("Errore lettura DHT22, riprovo tra 1 minuto.");
+  float t = bme.readTemperature();
+  float h = bme.readHumidity();
+  float p = bme.readPressure() / 100.0F; // Pa → hPa
+
+  if (isnan(t) || isnan(h) || isnan(p)) {
+    Serial.println("Errore lettura BME280, riprovo tra 1 minuto.");
     disconnectWiFi();
     delay(60000);
     return;
@@ -223,7 +242,9 @@ void loop() {
   Serial.print(t);
   Serial.print(" C  |  Umidita: ");
   Serial.print(h);
-  Serial.println(" %");
+  Serial.print(" %  |  Pressione: ");
+  Serial.print(p);
+  Serial.println(" hPa");
 
   // SDS011
   sds.wakeup();
@@ -270,9 +291,9 @@ void loop() {
   Serial.println(pm25n);
 
   // Invio a tutte le piattaforme
-  sendToSensorCommunity(pm10n, pm25n, t, h);
-  sendToOpenSenseMap(pm10n, pm25n, t, h);
-  sendToInfluxDB(pm10n, pm25n, t, h);
+  sendToSensorCommunity(pm10n, pm25n, t, h, p);
+  sendToOpenSenseMap(pm10n, pm25n, t, h, p);
+  sendToInfluxDB(pm10n, pm25n, t, h, p);
 
   Serial.print("\nSleep ");
   Serial.print(SLEEP_SECONDS / 60);

@@ -1,6 +1,6 @@
 # JonixLUG-AQI — Centralina qualità dell'aria
 
-Centralina open source per il monitoraggio della qualità dell'aria: particolato **PM2.5** e **PM10**, **temperatura** e **umidità**, con compensazione algoritmica dei valori di particolato in base all'umidità relativa.
+Centralina open source per il monitoraggio della qualità dell'aria: particolato **PM2.5** e **PM10**, **temperatura**, **umidità** e **pressione atmosferica**, con compensazione algoritmica dei valori di particolato in base all'umidità relativa.
 
 Fork del progetto originale [JonixLUG ABC](https://www.jonixlug.altervista.org/jonixlug-aria-bene-comune/) (GPLv3, 2019) con bugfix, pulizia del codice e invio multi-piattaforma.
 
@@ -18,21 +18,20 @@ Il firmware invia ogni lettura a tre piattaforme in parallelo (ciascuna attivabi
 
 | Componente | Modello | Pin Wemos |
 |---|---|---|
-| Microcontrollore | Wemos D1 Mini (ESP8266) | — |
-| Temperatura + umidità | DHT22 | D2 (GPIO4), 3.3V, GND |
+| Microcontrollore | Wemos D1 (ESP8266) | — |
+| Temp + umidità + pressione | BME280 (I2C) | D3 (SCL), D4 (SDA), 3.3V, GND |
 | Particolato PM2.5/PM10 | SDS011 (Nova Fitness) | D5 (GPIO14), D6 (GPIO12), 5V, GND |
 
-I due sensori condividono il pin GND del Wemos.
-
 ```
-Wemos D1 Mini
+Wemos D1
 ┌──────────────┐
-│  3.3V ───────┼──── DHT22 VCC
-│  D2 (GPIO4) ─┼──── DHT22 DATA
+│  3.3V ───────┼──── BME280 VIN
+│  D3 (SCL) ───┼──── BME280 SCL
+│  D4 (SDA) ───┼──── BME280 SDA
 │  5V ─────────┼──── SDS011 VCC
 │  D6 (GPIO12)─┼──── SDS011 TX
 │  D5 (GPIO14)─┼──── SDS011 RX
-│  GND ────────┼──── DHT22 GND + SDS011 GND
+│  GND ────────┼──── BME280 GND + SDS011 GND
 └──────────────┘
 ```
 
@@ -46,7 +45,7 @@ Alimentazione: qualsiasi sorgente 5V micro-USB, almeno 500mA (consigliato 1A).
    `https://arduino.esp8266.com/stable/package_esp8266com_index.json`
 3. Copia la cartella `libraries/` nella cartella librerie di Arduino IDE (es. `~/Arduino/libraries/`)
 4. Copia `config.h.example` in `config.h` e modifica i valori
-5. Compila e carica `jonixlug-aqi-v2.ino` sulla board Wemos D1 Mini
+5. Compila e carica `jonixlug-aqi-v2.ino` sulla board Wemos D1
 
 ## Configurazione
 
@@ -63,7 +62,7 @@ const bool ENABLE_SENSOR_COMMUNITY = true;
 // openSenseMap — registra un box su opensensemap.org
 const bool ENABLE_OPENSENSEMAP = true;
 const char* OSM_BOX_ID = "IL_TUO_BOX_ID";
-// ... + 4 sensor ID
+// ... + 5 sensor ID (PM10, PM2.5, Temp, Hum, Pressione)
 
 // InfluxDB — server self-hosted
 const bool ENABLE_INFLUXDB = true;
@@ -73,14 +72,14 @@ const char* INFLUX_HOST = "167.235.156.83";
 ### Registrazione sensori
 
 - **Sensor.Community**: registra su [devices.sensor.community](https://devices.sensor.community/) — il sensor ID è generato automaticamente dal chip ID dell'ESP8266
-- **openSenseMap**: crea un account e registra un box su [opensensemap.org](https://opensensemap.org/), aggiungi 4 sensori (PM10, PM2.5, Temperatura, Umidità) e copia gli ID nel `config.h`
+- **openSenseMap**: crea un account e registra un box su [opensensemap.org](https://opensensemap.org/), aggiungi 5 sensori (PM10, PM2.5, Temperatura, Umidità, Pressione) e copia gli ID nel `config.h`
 - **InfluxDB**: installa InfluxDB sulla tua VPS e crea il database `airquality`
 
 ## Cosa fa il firmware
 
 Ogni ciclo (default 15 min):
 1. Si connette al WiFi
-2. Legge temperatura e umidità dal DHT22
+2. Legge temperatura, umidità e pressione dal BME280
 3. Sveglia l'SDS011, calibra la ventola (15s), raccoglie 10 campioni
 4. Scarta i campioni fuori range e calcola la media
 5. Normalizza i valori PM in base all'umidità (algoritmo di compensazione)
@@ -89,6 +88,7 @@ Ogni ciclo (default 15 min):
 
 ## Modifiche V2 rispetto all'originale
 
+- **BME280** al posto del DHT22: aggiunge la pressione atmosferica, precisione ±0.5°C (vs ±2°C)
 - **Invio multi-piattaforma**: Sensor.Community + openSenseMap + InfluxDB al posto di ThingSpeak
 - **Fix stack overflow**: le chiamate ricorsive a `loop()` sono state sostituite con `return`
 - **Fix HTTP**: parsing risposta e formato richiesta corretti
@@ -99,13 +99,18 @@ Ogni ciclo (default 15 min):
 
 ## Installazione della centralina
 
+Tutta la centralina va dentro uno **Stevenson shield** stampato in 3D: un cilindro a lamelle sovrapposte, aperto sotto, che lascia circolare l'aria proteggendo da sole diretto e pioggia.
+
 - Posizionare in zona ombreggiata, con accesso diretto all'aria esterna
-- Protetta da pioggia (es. sotto un balcone)
-- Evitare raggi solari diretti sul sensore
+- Protetta da pioggia (es. sotto un balcone o tettoia)
+- L'SDS011 aspira l'aria col suo tubo — posizionarlo con l'ingresso aria rivolto verso il basso
+- Il BME280 deve essere esposto all'aria, non chiuso vicino al Wemos (calore)
 
 ## Case 3D
 
-File `.stl` per la stampa 3D del contenitore (design: Alessandro Chiffi / Ondata Studio) disponibili nel [repo originale](https://gitlab.com/JonixLUG/jonixlug-aqi).
+Stevenson shield personalizzato per questa centralina (in lavorazione presso FareZero Makers Fab Lab).
+
+Case originale V1: file `.stl` di Alessandro Chiffi / Ondata Studio nel [repo originale](https://gitlab.com/JonixLUG/jonixlug-aqi).
 
 ## Licenza e attribuzioni
 
