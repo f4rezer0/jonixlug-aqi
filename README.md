@@ -23,20 +23,11 @@ Il firmware invia ogni lettura a più piattaforme in parallelo (ciascuna attivab
 | Temp + umidità + pressione | BME280 (I2C) | D3 (SCL), D4 (SDA), 3.3V, GND |
 | Particolato PM2.5/PM10 | SDS011 (Nova Fitness) | D5 (GPIO14), D6 (GPIO12), 5V, GND |
 
-```
-Wemos D1
-┌──────────────┐
-│  3.3V ───────┼──── BME280 VIN
-│  D3 (SCL) ───┼──── BME280 SCL
-│  D4 (SDA) ───┼──── BME280 SDA
-│  5V ─────────┼──── SDS011 VCC
-│  D6 (GPIO12)─┼──── SDS011 TX
-│  D5 (GPIO14)─┼──── SDS011 RX
-│  GND ────────┼──── BME280 GND + SDS011 GND
-└──────────────┘
-```
+![Schema di collegamento](docs/wiring.svg)
 
-Alimentazione: qualsiasi sorgente 5V micro-USB, almeno 500mA (consigliato 1A).
+TX e RX dell'SDS011 sono incrociati: il TX del sensore va a D6, l'RX a D5. Il BME280 va alimentato a 3,3 V.
+
+Alimentazione: USB a 5 V (almeno 500 mA, consigliato 1 A) oppure jack DC a 12 V. Con il jack il regolatore onboard può scaldare: se serve, usare un buck 12V→5V sul pin 5V.
 
 ## Setup software
 
