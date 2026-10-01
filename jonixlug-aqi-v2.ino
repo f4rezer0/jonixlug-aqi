@@ -10,7 +10,8 @@
   Invio dati a:
     - Sensor.Community (rete globale citizen science)
     - openSenseMap (rete accademica open data)
-    - InfluxDB su VPS (dashboard Grafana personalizzata)
+    - InfluxDB su server FareZero (dashboard Grafana)
+    - Server giardino FareZero (comando /aria del bot Telegram)
 
   Basato sul progetto originale JonixLUG ABC (GPLv3, 2019)
   https://www.jonixlug.altervista.org/jonixlug-aria-bene-comune/
@@ -22,6 +23,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <WiFiClient.h>
+#include <WiFiClientSecure.h>
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
@@ -30,7 +32,7 @@
 
 #include "config.h"
 
-#define FW_VERSION "farezero-aqi-2.1.0"
+#define FW_VERSION "farezero-aqi-2.2.0"
 
 // --- Sensori ---
 #define SDS_TX  12   // D6 = GPIO12
@@ -166,10 +168,10 @@ void sendToOpenSenseMap(float pm10, float pm25, float temp, float hum, float pre
 void sendToInfluxDB(float pm10, float pm25, float temp, float hum, float pres) {
   if (!ENABLE_INFLUXDB) return;
 
-  WiFiClient wc;
+  WiFiClientSecure sc;
+  sc.setInsecure();
   HTTPClient http;
 
-  String url = "http://" + String(INFLUX_HOST) + ":" + String(INFLUX_PORT) + "/write?db=" + String(INFLUX_DB);
   String line = "air,sensor=farezero"
     " pm25=" + String(pm25)
     + ",pm10=" + String(pm10)
@@ -177,11 +179,36 @@ void sendToInfluxDB(float pm10, float pm25, float temp, float hum, float pres) {
     + ",humidity=" + String(hum)
     + ",pressure=" + String(pres);
 
-  http.begin(wc, url);
+  http.begin(sc, INFLUX_URL);
   http.addHeader("Content-Type", "text/plain");
+  http.addHeader("Authorization", String("Bearer ") + FAREZERO_TOKEN);
 
   int code = http.POST(line);
   Serial.print("[InfluxDB] → ");
+  Serial.println(code > 0 ? String(code) : "errore " + String(code));
+  http.end();
+}
+
+// --- Bot giardino FareZero ---
+void sendToFareZero(float pm10, float pm25, float temp, float hum, float pres) {
+  if (!ENABLE_FAREZERO) return;
+
+  WiFiClientSecure sc;
+  sc.setInsecure();
+  HTTPClient http;
+
+  String body = "{\"pm25\":" + String(pm25)
+    + ",\"pm10\":" + String(pm10)
+    + ",\"temperature\":" + String(temp)
+    + ",\"humidity\":" + String(hum)
+    + ",\"pressure\":" + String(pres) + "}";
+
+  http.begin(sc, FAREZERO_URL);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("Authorization", String("Bearer ") + FAREZERO_TOKEN);
+
+  int code = http.POST(body);
+  Serial.print("[FareZero] → ");
   Serial.println(code > 0 ? String(code) : "errore " + String(code));
   http.end();
 }
@@ -292,6 +319,7 @@ void loop() {
   sendToSensorCommunity(pm10n, pm25n, t, h, p);
   sendToOpenSenseMap(pm10n, pm25n, t, h, p);
   sendToInfluxDB(pm10n, pm25n, t, h, p);
+  sendToFareZero(pm10n, pm25n, t, h, p);
 
   Serial.print("\nSleep ");
   Serial.print(SLEEP_SECONDS / 60);

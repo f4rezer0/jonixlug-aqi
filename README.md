@@ -6,13 +6,14 @@ Fork del progetto originale [JonixLUG ABC](https://www.jonixlug.altervista.org/j
 
 ## Dove finiscono i dati
 
-Il firmware invia ogni lettura a tre piattaforme in parallelo (ciascuna attivabile/disattivabile da `config.h`):
+Il firmware invia ogni lettura a più piattaforme in parallelo (ciascuna attivabile/disattivabile da `config.h`):
 
 | Piattaforma | Tipo | Perché |
 |---|---|---|
 | [Sensor.Community](https://sensor.community/) | Rete globale citizen science | 15k+ stazioni, mappa pubblica, open data |
 | [openSenseMap](https://opensensemap.org/) | Rete accademica open data | Università di Münster, download CSV, interpolazione |
-| InfluxDB + Grafana | Self-hosted su VPS | Dashboard personalizzata su `aria.farezero.org` |
+| InfluxDB + Grafana | Self-hosted su server FareZero | Dashboard personalizzata su `aria.farezero.org` |
+| Bot giardino | `@FareZeroMakersBot` | Comando `/aria` su Telegram (vedi [garden-button](https://github.com/f4rezer0/garden-button)) |
 
 ## Hardware
 
@@ -64,16 +65,17 @@ const bool ENABLE_OPENSENSEMAP = true;
 const char* OSM_BOX_ID = "IL_TUO_BOX_ID";
 // ... + 5 sensor ID (PM10, PM2.5, Temp, Hum, Pressione)
 
-// InfluxDB — server self-hosted
-const bool ENABLE_INFLUXDB = true;
-const char* INFLUX_HOST = "167.235.156.83";
+// Server FareZero — InfluxDB e bot giardino (stesso token del pulsante giardino)
+const char* FAREZERO_TOKEN = "IL_TUO_GARDEN_TOKEN";
+const bool ENABLE_INFLUXDB = false;
+const bool ENABLE_FAREZERO = false;
 ```
 
 ### Registrazione sensori
 
 - **Sensor.Community**: registra su [devices.sensor.community](https://devices.sensor.community/) — il sensor ID è generato automaticamente dal chip ID dell'ESP8266
 - **openSenseMap**: crea un account e registra un box su [opensensemap.org](https://opensensemap.org/), aggiungi 5 sensori (PM10, PM2.5, Temperatura, Umidità, Pressione) e copia gli ID nel `config.h`
-- **InfluxDB**: installa InfluxDB sulla tua VPS e crea il database `airquality`
+- **InfluxDB / bot giardino**: il server FareZero espone `api.farezero.org/aria/write` e `api.farezero.org/garden/air` dietro Caddy (configurazione in `server/Caddyfile-snippet`); crea il database `airquality` e attiva i flag in `config.h` quando il server è pronto
 
 ## Cosa fa il firmware
 

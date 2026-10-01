@@ -1,0 +1,18 @@
+# Server FareZero — da aggiungere al Caddyfile (non ancora applicato).
+# Richiede GARDEN_TOKEN tra le variabili d'ambiente del container Caddy.
+
+# Scrittura dati dalla centralina verso InfluxDB (stesso Bearer token del giardino)
+# nel blocco api.farezero.org:
+handle_path /aria/write {
+    @authorized header Authorization "Bearer {env.GARDEN_TOKEN}"
+    handle @authorized {
+        rewrite * /write
+        reverse_proxy 172.18.0.1:8086
+    }
+    respond 401
+}
+
+# Dashboard pubblica Grafana:
+aria.farezero.org {
+    reverse_proxy 172.18.0.1:3000
+}
